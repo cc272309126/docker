@@ -297,6 +297,8 @@ func (container *Container) Start() (err error) {
 	// setup has been cleaned up properly
 	defer func() {
 		if err != nil {
+			container.setError(err)
+			container.toDisk()
 			container.cleanup()
 		}
 	}()
@@ -691,6 +693,9 @@ func (container *Container) Restart(seconds int) error {
 }
 
 func (container *Container) Resize(h, w int) error {
+	if !container.IsRunning() {
+		return fmt.Errorf("Cannot resize container %s, container is not running", container.ID)
+	}
 	return container.command.ProcessConfig.Terminal.Resize(h, w)
 }
 
