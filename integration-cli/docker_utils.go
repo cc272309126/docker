@@ -341,7 +341,9 @@ func cmd(t *testing.T, args ...string) (string, int, error) {
 
 func dockerCmd(t *testing.T, args ...string) (string, int, error) {
 	out, status, err := runCommandWithOutput(exec.Command(dockerBinary, args...))
-	errorOut(err, t, fmt.Sprintf("%q failed with errors: %v (%v)", strings.Join(args, " "), err, out))
+	if err != nil {
+		t.Fatalf("%q failed with errors: %s, %v", strings.Join(args, " "), out, err)
+	}
 	return out, status, err
 }
 
@@ -499,6 +501,16 @@ func inspectField(name, field string) (string, error) {
 
 func inspectFieldJSON(name, field string) (string, error) {
 	format := fmt.Sprintf("{{json .%s}}", field)
+	inspectCmd := exec.Command(dockerBinary, "inspect", "-f", format, name)
+	out, exitCode, err := runCommandWithOutput(inspectCmd)
+	if err != nil || exitCode != 0 {
+		return "", fmt.Errorf("failed to inspect %s: %s", name, out)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func inspectFieldMap(name, path, field string) (string, error) {
+	format := fmt.Sprintf("{{index .%s %q}}", path, field)
 	inspectCmd := exec.Command(dockerBinary, "inspect", "-f", format, name)
 	out, exitCode, err := runCommandWithOutput(inspectCmd)
 	if err != nil || exitCode != 0 {

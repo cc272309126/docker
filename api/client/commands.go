@@ -619,13 +619,13 @@ func (cli *DockerCli) CmdStart(args ...string) error {
 			return fmt.Errorf("You cannot start and attach multiple containers at once.")
 		}
 
-		steam, _, err := cli.call("GET", "/containers/"+cmd.Arg(0)+"/json", nil, false)
+		stream, _, err := cli.call("GET", "/containers/"+cmd.Arg(0)+"/json", nil, false)
 		if err != nil {
 			return err
 		}
 
 		env := engine.Env{}
-		if err := env.Decode(steam); err != nil {
+		if err := env.Decode(stream); err != nil {
 			return err
 		}
 		config := env.GetSubEnv("Config")
@@ -681,7 +681,16 @@ func (cli *DockerCli) CmdStart(args ...string) error {
 				log.Errorf("Error monitoring TTY size: %s", err)
 			}
 		}
-		return <-cErr
+		if attchErr := <-cErr; attchErr != nil {
+			return attchErr
+		}
+		_, status, err := getExitCode(cli, cmd.Arg(0))
+		if err != nil {
+			return err
+		}
+		if status != 0 {
+			return &utils.StatusError{StatusCode: status}
+		}
 	}
 	return nil
 }
@@ -1986,6 +1995,10 @@ func (cli *DockerCli) CmdTag(args ...string) error {
 }
 
 func (cli *DockerCli) pullImage(image string) error {
+	return cli.pullImageCustomOut(image, cli.out)
+}
+
+func (cli *DockerCli) pullImageCustomOut(image string, out io.Writer) error {
 	v := url.Values{}
 	repos, tag := parsers.ParseRepositoryTag(image)
 	// pull only the image tagged 'latest' if no tag was specified
@@ -2014,7 +2027,7 @@ func (cli *DockerCli) pullImage(image string) error {
 	registryAuthHeader := []string{
 		base64.URLEncoding.EncodeToString(buf),
 	}
-	if err = cli.stream("POST", "/images/create?"+v.Encode(), nil, cli.out, map[string][]string{"X-Registry-Auth": registryAuthHeader}); err != nil {
+	if err = cli.stream("POST", "/images/create?"+v.Encode(), nil, out, map[string][]string{"X-Registry-Auth": registryAuthHeader}); err != nil {
 		return err
 	}
 	return nil
@@ -2081,7 +2094,8 @@ func (cli *DockerCli) createContainer(config *runconfig.Config, hostConfig *runc
 	if statusCode == 404 {
 		fmt.Fprintf(cli.err, "Unable to find image '%s' locally\n", config.Image)
 
-		if err = cli.pullImage(config.Image); err != nil {
+		// we don't want to write to stdout anything apart from container.ID
+		if err = cli.pullImageCustomOut(config.Image, cli.err); err != nil {
 			return nil, err
 		}
 		// Retry

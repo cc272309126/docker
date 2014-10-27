@@ -642,7 +642,7 @@ This will create a container named `ubuntu_bash` and start a Bash session.
 This will create a new file `/tmp/execWorks` inside the running container
 `ubuntu_bash`, in the background.
 
-    $ sudo docker exec ubuntu_bash -it bash
+    $ sudo docker exec -it ubuntu_bash bash
 
 This will create a new Bash session in the container `ubuntu_bash`.
 
@@ -1225,6 +1225,9 @@ specified image, and then `starts` it using the specified command. That is,
 `/containers/(id)/start`. A stopped container can be restarted with all its
 previous changes intact using `docker start`. See `docker ps -a` to view a list
 of all containers.
+
+There is detailed infortmation about `docker run` in the [Docker run reference](
+/reference/run/).
 
 The `docker run` command can be used in combination with `docker commit` to
 [*change the command that a container runs*](#commit-an-existing-container).
