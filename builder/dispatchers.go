@@ -14,8 +14,8 @@ import (
 	"regexp"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/nat"
-	"github.com/docker/docker/pkg/log"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/runconfig"
 )
@@ -234,7 +234,7 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 func cmd(b *Builder, args []string, attributes map[string]bool, original string) error {
 	b.Config.Cmd = handleJsonArgs(args, attributes)
 
-	if !attributes["json"] && len(b.Config.Entrypoint) == 0 {
+	if !attributes["json"] {
 		b.Config.Cmd = append([]string{"/bin/sh", "-c"}, b.Config.Cmd...)
 	}
 
