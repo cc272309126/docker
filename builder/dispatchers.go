@@ -14,8 +14,8 @@ import (
 	"regexp"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/nat"
-	"github.com/docker/docker/pkg/log"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/runconfig"
 )
@@ -195,7 +195,7 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 
 	defer func(cmd []string) { b.Config.Cmd = cmd }(cmd)
 
-	log.Debugf("Command to be executed: %v", b.Config.Cmd)
+	log.Debugf("[BUILDER] Command to be executed: %v", b.Config.Cmd)
 
 	hit, err := b.probeCache()
 	if err != nil {
@@ -234,7 +234,7 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 func cmd(b *Builder, args []string, attributes map[string]bool, original string) error {
 	b.Config.Cmd = handleJsonArgs(args, attributes)
 
-	if !attributes["json"] && len(b.Config.Entrypoint) == 0 {
+	if !attributes["json"] {
 		b.Config.Cmd = append([]string{"/bin/sh", "-c"}, b.Config.Cmd...)
 	}
 
@@ -261,14 +261,14 @@ func entrypoint(b *Builder, args []string, attributes map[string]bool, original 
 	parsed := handleJsonArgs(args, attributes)
 
 	switch {
-	case len(parsed) == 0:
-		// ENTYRPOINT []
-		b.Config.Entrypoint = nil
 	case attributes["json"]:
 		// ENTRYPOINT ["echo", "hi"]
 		b.Config.Entrypoint = parsed
+	case len(parsed) == 0:
+		// ENTRYPOINT []
+		b.Config.Entrypoint = nil
 	default:
-		// ENTYRPOINT echo hi
+		// ENTRYPOINT echo hi
 		b.Config.Entrypoint = []string{"/bin/sh", "-c", parsed[0]}
 	}
 
