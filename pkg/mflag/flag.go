@@ -861,13 +861,8 @@ func (f *FlagSet) parseOne() (bool, string, error) {
 	flag, alreadythere := m[name] // BUG
 	if !alreadythere {
 		if name == "-help" || name == "help" || name == "h" { // special case for nice help message.
-<<<<<<< HEAD
                         // usage message piped into Stdout
                         f.SetOutput(os.Stdout)
-=======
-			// usage message piped into Stdout
-			f.SetOutput(os.Stdout)
->>>>>>> 3cd9be48df6cc533f5037b004337bbf6f91bffe0
 			f.usage()
 			return false, "", ErrHelp
 		}
