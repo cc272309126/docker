@@ -102,13 +102,17 @@ func (container *Container) FromDisk() error {
 		return err
 	}
 
-	data, err := ioutil.ReadFile(pth)
+	jsonSource, err := os.Open(pth)
 	if err != nil {
 		return err
 	}
+	defer jsonSource.Close()
+
+	dec := json.NewDecoder(jsonSource)
+
 	// Load container settings
 	// udp broke compat of docker.PortMapping, but it's not used when loading a container, we can skip it
-	if err := json.Unmarshal(data, container); err != nil && !strings.Contains(err.Error(), "docker.PortMapping") {
+	if err := dec.Decode(container); err != nil && !strings.Contains(err.Error(), "docker.PortMapping") {
 		return err
 	}
 
@@ -457,6 +461,7 @@ func (container *Container) AllocateNetwork() error {
 	)
 
 	job := eng.Job("allocate_interface", container.ID)
+	job.Setenv("RequestedMac", container.Config.MacAddress)
 	if env, err = job.Stdout.AddEnv(); err != nil {
 		return err
 	}
@@ -527,7 +532,9 @@ func (container *Container) ReleaseNetwork() {
 	}
 	eng := container.daemon.eng
 
-	eng.Job("release_interface", container.ID).Run()
+	job := eng.Job("release_interface", container.ID)
+	job.SetenvBool("overrideShutdown", true)
+	job.Run()
 	container.NetworkSettings = &NetworkSettings{}
 }
 
