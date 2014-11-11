@@ -832,7 +832,7 @@ func NewDaemonFromDirectory(config *Config, eng *engine.Engine) (*Daemon, error)
 	}
 
 	log.Debugf("Creating repository list")
-	repositories, err := graph.NewTagStore(path.Join(config.Root, "repositories-"+driver.String()), g, config.Mirrors)
+	repositories, err := graph.NewTagStore(path.Join(config.Root, "repositories-"+driver.String()), g, config.Mirrors, config.InsecureRegistries)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create Tag store: %s", err)
 	}
@@ -970,6 +970,7 @@ func (daemon *Daemon) Mount(container *Container) error {
 	if container.basefs == "" {
 		container.basefs = dir
 	} else if container.basefs != dir {
+		daemon.driver.Put(container.ID)
 		return fmt.Errorf("Error: driver %s is returning inconsistent paths for container %s ('%s' then '%s')",
 			daemon.driver, container.ID, container.basefs, dir)
 	}

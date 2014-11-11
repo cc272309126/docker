@@ -14,7 +14,8 @@ successively.
 This page discusses the specifics of all the instructions you can use in your
 `Dockerfile`. To further help you write a clear, readable, maintainable
 `Dockerfile`, we've also written a [`Dockerfile` Best Practices
-guide](/articles/dockerfile_best-practices).
+guide](/articles/dockerfile_best-practices). Lastly, you can test your
+Dockerfile knowledge with the [Dockerfile tutorial](/userguide/level1).
 
 ## Usage
 
@@ -730,7 +731,8 @@ documentation.
     USER daemon
 
 The `USER` instruction sets the user name or UID to use when running the image
-and for any following `RUN` directives.
+and for any `RUN`, `CMD` and `ENTRYPOINT` instructions that follow it in the
+`Dockerfile`.
 
 ## WORKDIR
 
