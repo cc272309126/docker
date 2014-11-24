@@ -84,6 +84,7 @@ expect an integer, and they can only be specified once.
       -s, --storage-driver=""                    Force the Docker runtime to use a specific storage driver
       --selinux-enabled=false                    Enable selinux support. SELinux does not presently support the BTRFS storage driver
       --storage-opt=[]                           Set storage driver options
+                                                   Force Docker to use specific options for DEVMAPPER storage driver, and this would be used something like `docker -d --storage-opt dm.foo=bar`
       --tls=false                                Use TLS; implied by --tlsverify flag
       --tlscacert="/home/sven/.docker/ca.pem"    Trust only remotes providing a certificate signed by the CA given here
       --tlscert="/home/sven/.docker/cert.pem"    Path to TLS certificate file
