@@ -11,7 +11,7 @@ or execute `docker help`:
       Usage: docker [OPTIONS] COMMAND [arg...]
         -H, --host=[]: The socket(s) to bind to in daemon mode, specified using one or more tcp://host:port, unix:///path/to/socket, fd://* or fd://socketfd.
 
-      A self-sufficient runtime for linux containers.
+      A self-sufficient runtime for Linux containers.
 
       ...
 
@@ -70,11 +70,13 @@ expect an integer, and they can only be specified once.
       -g, --graph="/var/lib/docker"              Path to use as the root of the Docker runtime
       -H, --host=[]                              The socket(s) to bind to in daemon mode or connect to in client mode, specified using one or more tcp://host:port, unix:///path/to/socket, fd://* or fd://socketfd.
       --icc=true                                 Enable inter-container communication
-      --insecure-registry=[]                     Enable insecure communication with specified registries (no certificate verification for HTTPS and enable HTTP fallback)
+      --insecure-registry=[]                     Enable insecure communication with specified registries (disables certificate verification for HTTPS and enables HTTP fallback) (e.g., localhost:5000 or 10.20.0.0/16)
       --ip=0.0.0.0                               Default IP address to use when binding container ports
       --ip-forward=true                          Enable net.ipv4.ip_forward
       --ip-masq=true                             Enable IP masquerading for bridge's IP range
       --iptables=true                            Enable Docker's addition of iptables rules
+       -l, --log-level="info"                    Set the logging level
+      --label=[]                                 Set key=value labels to the daemon (displayed in `docker info`)
       --mtu=0                                    Set the containers network MTU
                                                    if no value is provided: default to the default route MTU or 1500 if no default route is available
       -p, --pidfile="/var/run/docker.pid"        Path to use for daemon PID file
@@ -82,7 +84,7 @@ expect an integer, and they can only be specified once.
       -s, --storage-driver=""                    Force the Docker runtime to use a specific storage driver
       --selinux-enabled=false                    Enable selinux support. SELinux does not presently support the BTRFS storage driver
       --storage-opt=[]                           Set storage driver options
-      --tls=false                                Use TLS; implied by tls-verify flags
+      --tls=false                                Use TLS; implied by --tlsverify flag
       --tlscacert="/home/sven/.docker/ca.pem"    Trust only remotes providing a certificate signed by the CA given here
       --tlscert="/home/sven/.docker/cert.pem"    Path to TLS certificate file
       --tlskey="/home/sven/.docker/key.pem"      Path to TLS key file
@@ -109,7 +111,7 @@ requiring either `root` permission, or `docker` group membership.
 If you need to access the Docker daemon remotely, you need to enable the `tcp`
 Socket. Beware that the default setup provides un-encrypted and un-authenticated
 direct access to the Docker daemon - and should be secured either using the
-[built in https encrypted socket](/articles/https/), or by putting a secure web
+[built in HTTPS encrypted socket](/articles/https/), or by putting a secure web
 proxy in front of it. You can listen on port `2375` on all network interfaces
 with `-H tcp://0.0.0.0:2375`, or on a particular network interface using its IP
 address: `-H tcp://192.168.59.103:2375`. It is conventional to use port `2375`
@@ -154,7 +156,7 @@ string is equivalent to setting the `--tlsverify` flag. The following are equiva
 ### Daemon storage-driver option
 
 The Docker daemon has support for three different image layer storage drivers: `aufs`,
-`devicemapper`, and `btrfs`.
+`devicemapper`, `btrfs` and `overlayfs`.
 
 The `aufs` driver is the oldest, but is based on a Linux kernel patch-set that
 is unlikely to be merged into the main kernel. These are also known to cause some
@@ -173,6 +175,9 @@ To tell the Docker daemon to use `devicemapper`, use
 The `btrfs` driver is very fast for `docker build` - but like `devicemapper` does not
 share executable memory between devices. Use `docker -d -s btrfs -g /mnt/btrfs_partition`.
 
+The `overlayfs` is a very fast union filesystem. It is now merged in the main
+Linux kernel as of [3.18.0](https://lkml.org/lkml/2014/10/26/137).
+Call `docker -d -s overlayfs` to use it.
 
 ### Docker exec-driver option
 
@@ -193,23 +198,43 @@ To set the DNS server for all Docker containers, use
 To set the DNS search domain for all Docker containers, use
 `docker -d --dns-search example.com`.
 
+### Insecure registries
+
+Docker considers a private registry either secure or insecure.
+In the rest of this section, *registry* is used for *private registry*, and `myregistry:5000`
+is a placeholder example for a private registry.
+
+A secure registry uses TLS and a copy of its CA certificate is placed on the Docker host at
+`/etc/docker/certs.d/myregistry:5000/ca.crt`.
+An insecure registry is either not using TLS (i.e., listening on plain text HTTP), or is using
+TLS with a CA certificate not known by the Docker daemon. The latter can happen when the
+certificate was not found under `/etc/docker/certs.d/myregistry:5000/`, or if the certificate
+verification failed (i.e., wrong CA).
+
+By default, Docker assumes all, but local (see local registries below), registries are secure.
+Communicating with an insecure registry is not possible if Docker assumes that registry is secure.
+In order to communicate with an insecure registry, the Docker daemon requires `--insecure-registry`
+in one of the following two forms: 
+
+* `--insecure-registry myregistry:5000` tells the Docker daemon that myregistry:5000 should be considered insecure.
+* `--insecure-registry 10.1.0.0/16` tells the Docker daemon that all registries whose domain resolve to an IP address is part
+of the subnet described by the CIDR syntax, should be considered insecure.
+
+The flag can be used multiple times to allow multiple registries to be marked as insecure.
+
+If an insecure registry is not marked as insecure, `docker pull`, `docker push`, and `docker search`
+will result in an error message prompting the user to either secure or pass the `--insecure-registry`
+flag to the Docker daemon as described above.
+
+Local registries, whose IP address falls in the 127.0.0.0/8 range, are automatically marked as insecure
+as of Docker 1.3.2. It is not recommended to rely on this, as it may change in the future.
+
+
 ### Miscellaneous options
 
 IP masquerading uses address translation to allow containers without a public IP to talk
 to other machines on the Internet. This may interfere with some network topologies and
 can be disabled with --ip-masq=false.
-
-
-By default, Docker will assume all registries are secured via TLS with certificate verification
-enabled. Prior versions of Docker used an auto fallback if a registry did not support TLS
-(or if the TLS connection failed). This introduced the opportunity for Man In The Middle (MITM)
-attacks, so as of Docker 1.3.1, the user must now specify the `--insecure-registry` daemon flag
-for each insecure registry. An insecure registry is either not using TLS (i.e. plain text HTTP),
-or is using TLS with a CA certificate not known by the Docker daemon (i.e. certification
-verification disabled). For example, if there is a registry listening for HTTP at 127.0.0.1:5000,
-as of Docker 1.3.1 you are required to specify `--insecure-registry 127.0.0.1:5000` when starting
-the Docker daemon.
-
 
 Docker supports softlinks for the Docker data directory
 (`/var/lib/docker`) and for `/var/lib/docker/tmp`. The `DOCKER_TMPDIR` and the data directory can be set like this:
@@ -227,7 +252,7 @@ Docker supports softlinks for the Docker data directory
     Attach to a running container
 
       --no-stdin=false    Do not attach STDIN
-      --sig-proxy=true    Proxy all received signals to the process (even in non-TTY mode). SIGCHLD, SIGKILL, and SIGSTOP are not proxied.
+      --sig-proxy=true    Proxy all received signals to the process (non-TTY mode only). SIGCHLD, SIGKILL, and SIGSTOP are not proxied.
 
 The `attach` command lets you view or interact with any running container's
 primary process (`pid 1`).
@@ -646,7 +671,11 @@ You'll need two shells for this example.
 
 The `docker exec` command runs a new command in a running container.
 
-The `docker exec` command will typically be used after `docker run` or `docker start`.
+The command started using `docker exec` will only run while the container's primary
+process (`PID 1`) is running, and will not be restarted if the container is restarted.
+
+If the container is paused, then the `docker exec` command will wait until the
+container is unpaused, and then run.
 
 #### Examples
 
@@ -712,19 +741,24 @@ decrease disk usage, and speed up `docker build` by
 allowing each step to be cached. These intermediate layers are not shown
 by default.
 
+An image will be listed more than once if it has multiple repository names
+or tags. This single image (identifiable by its matching `IMAGE ID`)
+uses up the `VIRTUAL SIZE` listed only once.
+
 #### Listing the most recently created images
 
     $ sudo docker images | head
-    REPOSITORY                    TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
-    <none>                        <none>              77af4d6b9913        19 hours ago        1.089 GB
-    committest                    latest              b6fa739cedf5        19 hours ago        1.089 GB
-    <none>                        <none>              78a85c484f71        19 hours ago        1.089 GB
-    docker                        latest              30557a29d5ab        20 hours ago        1.089 GB
-    <none>                        <none>              0124422dd9f9        20 hours ago        1.089 GB
-    <none>                        <none>              18ad6fad3402        22 hours ago        1.082 GB
-    <none>                        <none>              f9f1e26352f0        23 hours ago        1.089 GB
-    tryout                        latest              2629d1fa0b81        23 hours ago        131.5 MB
-    <none>                        <none>              5ed6274db6ce        24 hours ago        1.089 GB
+    REPOSITORY                TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+    <none>                    <none>              77af4d6b9913        19 hours ago        1.089 GB
+    committ                   latest              b6fa739cedf5        19 hours ago        1.089 GB
+    <none>                    <none>              78a85c484f71        19 hours ago        1.089 GB
+    docker                    latest              30557a29d5ab        20 hours ago        1.089 GB
+    <none>                    <none>              5ed6274db6ce        24 hours ago        1.089 GB
+    postgres                  9                   746b819f315e        4 days ago          213.4 MB
+    postgres                  9.3                 746b819f315e        4 days ago          213.4 MB
+    postgres                  9.3.5               746b819f315e        4 days ago          213.4 MB
+    postgres                  latest              746b819f315e        4 days ago          213.4 MB
+
 
 #### Listing the full length image IDs
 
@@ -825,11 +859,15 @@ For example:
     $ sudo docker -D info
     Containers: 14
     Images: 52
-    Storage Driver: btrfs
+    Storage Driver: aufs
+     Root Dir: /var/lib/docker/aufs
+     Dirs: 545
     Execution Driver: native-0.2
     Kernel Version: 3.13.0-24-generic
     Operating System: Ubuntu 14.04 LTS
     CPUs: 1
+    Name: prod-server-42
+    ID: 7TRN:IPZB:QYBB:VPBQ:UMPP:KARE:6ZNR:XE6T:7EWV:PKF4:ZOJD:TPYS
     Total Memory: 2 GiB
     Debug mode (server): false
     Debug mode (client): true
@@ -839,6 +877,8 @@ For example:
     Init Path: /usr/bin/docker
     Username: svendowideit
     Registry: [https://index.docker.io/v1/]
+    Labels:
+     storage=ssd
 
 The global `-D` option tells all `docker` commands to output debug information.
 
@@ -1042,7 +1082,7 @@ for further details.
       -n=-1                 Show n last created containers, include non-running ones.
       --no-trunc=false      Don't truncate output
       -q, --quiet=false     Only display numeric IDs
-      -s, --size=false      Display sizes
+      -s, --size=false      Display total file sizes
       --since=""            Show only containers created since Id or Name, include non-running ones.
 
 Running `docker ps` showing 2 linked containers.
@@ -1239,7 +1279,7 @@ removed before the image is removed.
       --privileged=false         Give extended privileges to this container
       --restart=""               Restart policy to apply when a container exits (no, on-failure[:max-retry], always)
       --rm=false                 Automatically remove the container when it exits (incompatible with -d)
-      --sig-proxy=true           Proxy received signals to the process (even in non-TTY mode). SIGCHLD, SIGSTOP, and SIGKILL are not proxied.
+      --sig-proxy=true           Proxy received signals to the process (non-TTY mode only). SIGCHLD, SIGSTOP, and SIGKILL are not proxied.
       -t, --tty=false            Allocate a pseudo-TTY
       -u, --user=""              Username or UID
       -v, --volume=[]            Bind mount a volume (e.g., from the host: -v /host:/container, from Docker: -v /container)
@@ -1253,7 +1293,7 @@ specified image, and then `starts` it using the specified command. That is,
 previous changes intact using `docker start`. See `docker ps -a` to view a list
 of all containers.
 
-There is detailed infortmation about `docker run` in the [Docker run reference](
+There is detailed information about `docker run` in the [Docker run reference](
 /reference/run/).
 
 The `docker run` command can be used in combination with `docker commit` to
