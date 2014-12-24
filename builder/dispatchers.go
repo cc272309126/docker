@@ -392,13 +392,36 @@ func dispatchImport(b *Builder, args []string, attributes map[string]bool, origi
 	if len(args) == 0 {
 		return fmt.Errorf("Import cannot be empty")
 	}
-	for _, v := range args {
-		if existImport(v) {
+
+	dest := "" // there is no dest for import comand
+	copyInfos := []*copyInfo{}
+
+	// delete all the tmp dir
+	defer func() {
+		for _, ci := range copyInfos {
+			if ci.tmpDir != "" {
+				os.RemoveAll(ci.tmpDir)
+			}
+		}
+	}()
+
+	for _, orig := range args {
+		err := calcCopyInfo(b, "IMPORT", &copyInfos, orig, dest, true, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(copyInfos) == 0 {
+		return fmt.Errorf("No source files were specified")
+	}
+	for _, ci := range copyInfos {
+		if existImport(ci.origPath) {
 			return fmt.Errorf("Cannot import one dockerfile twice")
 		}
-		ExistImport[v] = true
+		ExistImport[ci.origPath] = true
 
-		filename := path.Join(b.contextPath, v)
+		filename := path.Join(b.contextPath, ci.origPath)
 
 		fi, err := os.Stat(filename)
 		if os.IsNotExist(err) {
